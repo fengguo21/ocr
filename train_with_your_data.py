@@ -194,7 +194,7 @@ def main():
             print(f"✅ 保存最佳模型，损失: {best_loss:.4f}")
         
         # 定期保存
-        if epoch % 10 == 0:
+        if epoch % 1 == 0:
             checkpoint = {
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
