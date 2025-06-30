@@ -1,0 +1,31 @@
+{
+  "name": "身份证OCR训练数据集",
+  "description": "用于训练身份证识别模型的数据集",
+  "version": "1.0",
+  "models": {
+    "CRNN": {
+      "task": "文本识别",
+      "input": "文本区域图像",
+      "output": "识别的文字",
+      "image_height": 32,
+      "data_format": "images/ + labels.txt"
+    },
+    "CRAFT": {
+      "task": "文本检测",
+      "input": "完整场景图像",
+      "output": "文本框坐标",
+      "data_format": "images/ + gt_*.txt"
+    }
+  },
+  "charset": "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ中华人民共和国身份证姓名性别民族出生年月日住址公民号码签发机关有效期限长至汉族男女省市县区街道路号楼室派出所公安局厅",
+  "fields": [
+    "姓名",
+    "性别",
+    "民族",
+    "出生",
+    "住址",
+    "公民身份号码",
+    "签发机关",
+    "有效期限"
+  ]
+}

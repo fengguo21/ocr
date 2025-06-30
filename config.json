@@ -1,0 +1,24 @@
+{
+  "ocr_method": "paddleocr",
+  "crnn_config": {
+    "img_h": 32,
+    "nc": 1,
+    "nh": 256,
+    "model_path": "models/crnn_model.pth"
+  },
+  "detection_config": {
+    "text_threshold": 0.7,
+    "link_threshold": 0.4,
+    "low_text": 0.4
+  },
+  "preprocessing": {
+    "target_size": [640, 480],
+    "enable_denoising": true,
+    "enable_skew_correction": true,
+    "enable_enhancement": true
+  },
+  "postprocessing": {
+    "enable_validation": true,
+    "enable_format_normalization": true
+  }
+} 
