@@ -53,7 +53,7 @@ class EarlyStopping:
             return self.counter >= self.patience
 
 
-def train_epoch(model, dataloader, optimizer, criterion, device, epoch):
+def train_epoch(model, dataloader, optimizer, criterion, device, epoch, save_dir=None, save_freq=100):
     """训练一个epoch"""
     model.train()
     total_loss = 0
@@ -95,11 +95,31 @@ def train_epoch(model, dataloader, optimizer, criterion, device, epoch):
             total_geo_loss += geo_loss.item()
             batch_count += 1
             
+            # 每100个batch保存模型
+            if save_dir and (batch_idx + 1) % save_freq == 0:
+                avg_loss_so_far = total_loss / batch_count
+                checkpoint = {
+                    'epoch': epoch,
+                    'batch': batch_idx + 1,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'train_loss': avg_loss_so_far,
+                    'cls_loss': total_cls_loss / batch_count,
+                    'geo_loss': total_geo_loss / batch_count,
+                    'total_batches': epoch * len(dataloader) + batch_idx + 1
+                }
+                
+                save_path = os.path.join(save_dir, f'checkpoint_epoch_{epoch+1}_batch_{batch_idx+1}.pth')
+                torch.save(checkpoint, save_path)
+                
+                pbar.set_description(f'Epoch {epoch+1} - 训练 [已保存: batch {batch_idx+1}]')
+            
             pbar.set_postfix({
                 'loss': f'{loss.item():.4f}',
                 'cls': f'{cls_loss.item():.4f}',
                 'geo': f'{geo_loss.item():.4f}',
-                'errors': error_count
+                'errors': error_count,
+                'avg_loss': f'{total_loss/batch_count:.4f}'
             })
             
         except Exception as e:
@@ -170,6 +190,7 @@ def main():
     parser.add_argument('--save_dir', type=str, default='checkpoints_improved', help='模型保存目录')
     parser.add_argument('--resume', type=str, help='恢复训练的模型路径')
     parser.add_argument('--patience', type=int, default=7, help='早停耐心值')
+    parser.add_argument('--save_freq', type=int, default=100, help='每多少个batch保存一次模型')
     
     args = parser.parse_args()
     
@@ -193,6 +214,7 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
     
     print(f"📈 训练样本: {len(train_dataset)}, 验证样本: {len(val_dataset)}")
+    print(f"📦 保存策略: 每{args.save_freq}个batch保存一次检查点")
     
     # 创建模型
     model = CRAFT(pretrained=True, freeze=False).to(device)
@@ -210,7 +232,8 @@ def main():
     for epoch in range(args.epochs):
         # 训练
         train_loss, train_cls_loss, train_geo_loss, train_errors = train_epoch(
-            model, train_loader, optimizer, criterion, device, epoch
+            model, train_loader, optimizer, criterion, device, epoch, 
+            save_dir=args.save_dir, save_freq=args.save_freq
         )
         
         # 验证
