@@ -9,8 +9,8 @@ import math
 import json
 
 
-class OCRDataset(Dataset):
-    """适配带有box、cls、word信息的OCR数据集"""
+class OCRDatasetFixed(Dataset):
+    """修复版OCR数据集 - 正确实现CRAFT热力图生成"""
     
     def __init__(self, hf_dataset, split='train', input_size=512, target_size=256):
         self.dataset = hf_dataset[split]
@@ -33,7 +33,7 @@ class OCRDataset(Dataset):
         if isinstance(image, Image.Image):
             image = np.array(image)
         
-        # 获取标注信息 - 修复：数据在'ocr'字段中
+        # 获取标注信息
         annotations = []
         if 'ocr' in item:
             for ocr_item in item['ocr']:
@@ -51,7 +51,7 @@ class OCRDataset(Dataset):
                     })
         
         # 生成CRAFT训练用的热力图
-        char_heatmap, link_heatmap = self._generate_heatmaps(image, annotations)
+        char_heatmap, link_heatmap = self._generate_heatmaps_fixed(image, annotations)
         
         # 调整尺寸
         image, char_heatmap, link_heatmap = self._resize_data(
@@ -67,10 +67,8 @@ class OCRDataset(Dataset):
     
     def _parse_box_coords(self, box_coords):
         """解析边界框坐标"""
-        # box_coords是[x1, y1, x2, y2]格式（矩形边界框）
         if len(box_coords) == 4:
             x1, y1, x2, y2 = box_coords
-            # 转换为四个角点坐标
             coords = [
                 [x1, y1],  # 左上
                 [x2, y1],  # 右上
@@ -78,7 +76,6 @@ class OCRDataset(Dataset):
                 [x1, y2]   # 左下
             ]
         else:
-            # 如果是8点坐标格式，按原来的逻辑处理
             coords = []
             for i in range(0, len(box_coords), 2):
                 if i + 1 < len(box_coords):
@@ -88,8 +85,8 @@ class OCRDataset(Dataset):
         
         return np.array(coords)
     
-    def _generate_heatmaps(self, image, annotations):
-        """修复版：正确生成字符级和链接级热图"""
+    def _generate_heatmaps_fixed(self, image, annotations):
+        """修复版：正确生成CRAFT热力图"""
         h, w = image.shape[:2]
         
         # 初始化热图
@@ -99,18 +96,40 @@ class OCRDataset(Dataset):
         # 按位置排序标注（从左到右，从上到下）
         sorted_annotations = self._sort_annotations_by_position(annotations)
         
-        # 生成字符级热图
+        # 生成字符区域热图
         for ann in sorted_annotations:
             coords = ann['coords']
-            self._generate_char_heatmap(char_heatmap, coords)
+            self._generate_char_region_heatmap(char_heatmap, coords)
         
         # 生成相邻文本的链接热图
         self._generate_affinity_heatmap(link_heatmap, sorted_annotations, h, w)
         
         return char_heatmap, link_heatmap
     
-    def _generate_char_heatmap(self, heatmap, coords):
-        """生成字符级热图 - 修复版：覆盖整个文本框"""
+    def _sort_annotations_by_position(self, annotations):
+        """按位置排序标注（从左到右，从上到下）"""
+        def get_center(coords):
+            return (np.mean(coords[:, 0]), np.mean(coords[:, 1]))
+        
+        # 按y坐标分组（行）
+        y_groups = {}
+        for ann in annotations:
+            center_x, center_y = get_center(ann['coords'])
+            y_key = int(center_y // 50)  # 50像素为一行
+            if y_key not in y_groups:
+                y_groups[y_key] = []
+            y_groups[y_key].append((ann, center_x, center_y))
+        
+        # 每行内按x坐标排序，行间按y坐标排序
+        sorted_annotations = []
+        for y_key in sorted(y_groups.keys()):
+            row = sorted(y_groups[y_key], key=lambda x: x[1])  # 按x坐标排序
+            sorted_annotations.extend([item[0] for item in row])
+        
+        return sorted_annotations
+    
+    def _generate_char_region_heatmap(self, heatmap, coords):
+        """生成字符区域热图 - 覆盖整个文本框"""
         # 计算文本框的边界
         x_min, x_max = int(np.min(coords[:, 0])), int(np.max(coords[:, 0]))
         y_min, y_max = int(np.min(coords[:, 1])), int(np.max(coords[:, 1]))
@@ -149,47 +168,23 @@ class OCRDataset(Dataset):
                 # 更新热图（取最大值）
                 heatmap[y, x] = max(heatmap[y, x], value)
     
-    def _generate_link_heatmap(self, heatmap, coords):
-        """生成链接级热图 - 修复版：连接相邻文本（暂时占位，主逻辑在_generate_heatmaps中）"""
-        # 此方法现在由_generate_heatmaps统一处理相邻文本的链接
-        pass
-    
-    def _sort_annotations_by_position(self, annotations):
-        """按位置排序标注（从左到右，从上到下）"""
-        def get_center(coords):
-            return (np.mean(coords[:, 0]), np.mean(coords[:, 1]))
-        
-        # 按y坐标分组（行）
-        y_groups = {}
-        for ann in annotations:
-            center_x, center_y = get_center(ann['coords'])
-            y_key = int(center_y // 50)  # 50像素为一行
-            if y_key not in y_groups:
-                y_groups[y_key] = []
-            y_groups[y_key].append((ann, center_x, center_y))
-        
-        # 每行内按x坐标排序，行间按y坐标排序
-        sorted_annotations = []
-        for y_key in sorted(y_groups.keys()):
-            row = sorted(y_groups[y_key], key=lambda x: x[1])  # 按x坐标排序
-            sorted_annotations.extend([item[0] for item in row])
-        
-        return sorted_annotations
-    
     def _generate_affinity_heatmap(self, heatmap, sorted_annotations, h, w):
         """生成相邻文本的链接热图"""
-        # 按行分组
-        lines = self._group_by_lines(sorted_annotations)
+        for i in range(len(sorted_annotations) - 1):
+            current = sorted_annotations[i]
+            next_ann = sorted_annotations[i + 1]
+            
+            # 计算两个文本框的中心
+            center1 = np.mean(current['coords'], axis=0)
+            center2 = np.mean(next_ann['coords'], axis=0)
+            
+            # 检查是否为相邻文本（距离阈值）
+            distance = np.linalg.norm(center2 - center1)
+            if distance < 200:  # 调整此阈值
+                self._draw_affinity_link(heatmap, center1, center2, h, w)
         
-        for line in lines:
-            if len(line) > 1:
-                for i in range(len(line) - 1):
-                    center1 = np.mean(line[i]['coords'], axis=0)
-                    center2 = np.mean(line[i+1]['coords'], axis=0)
-                    
-                    # 检查水平距离
-                    if abs(center2[0] - center1[0]) < 150:  # 水平相邻
-                        self._draw_affinity_link(heatmap, center1, center2, h, w)
+        # 同时处理同一行内的相邻文本
+        self._generate_line_affinity(heatmap, sorted_annotations, h, w)
     
     def _draw_affinity_link(self, heatmap, point1, point2, h, w):
         """在两点间绘制链接热图"""
@@ -208,14 +203,29 @@ class OCRDataset(Dataset):
             
             if 0 <= x < w and 0 <= y < h:
                 # 在连线周围生成高斯分布
-                sigma = 8  # 链接的宽度
+                sigma = 5  # 链接的宽度
                 for dy in range(-sigma*2, sigma*2+1):
                     for dx in range(-sigma*2, sigma*2+1):
                         nx, ny = x + dx, y + dy
                         if 0 <= nx < w and 0 <= ny < h:
                             dist = math.sqrt(dx**2 + dy**2)
                             value = math.exp(-dist**2 / (2 * sigma**2))
-                            heatmap[ny, nx] = max(heatmap[ny, nx], value * 0.8)  # 链接强度稍低
+                            heatmap[ny, nx] = max(heatmap[ny, nx], value)
+    
+    def _generate_line_affinity(self, heatmap, sorted_annotations, h, w):
+        """生成同行文本的链接"""
+        # 按行分组
+        lines = self._group_by_lines(sorted_annotations)
+        
+        for line in lines:
+            if len(line) > 1:
+                for i in range(len(line) - 1):
+                    center1 = np.mean(line[i]['coords'], axis=0)
+                    center2 = np.mean(line[i+1]['coords'], axis=0)
+                    
+                    # 检查水平距离
+                    if abs(center2[0] - center1[0]) < 150:  # 水平相邻
+                        self._draw_affinity_link(heatmap, center1, center2, h, w)
     
     def _group_by_lines(self, annotations):
         """将标注按行分组"""
@@ -236,7 +246,7 @@ class OCRDataset(Dataset):
                     continue
                     
                 other_center_y = np.mean(other_ann['coords'][:, 1])
-                if abs(other_center_y - center_y) < 40:  # 同一行的阈值
+                if abs(other_center_y - center_y) < 30:  # 同一行的阈值
                     line.append(other_ann)
                     used.add(j)
             
@@ -246,25 +256,6 @@ class OCRDataset(Dataset):
                 lines.append(line)
         
         return lines
-    
-    def _add_gaussian_heatmap(self, heatmap, center_x, center_y, sigma):
-        """添加高斯热图（已弃用，保留兼容性）"""
-        h, w = heatmap.shape
-        
-        # 计算高斯核的范围
-        radius = int(sigma * 3)
-        
-        for y in range(max(0, int(center_y - radius)), 
-                      min(h, int(center_y + radius + 1))):
-            for x in range(max(0, int(center_x - radius)), 
-                          min(w, int(center_x + radius + 1))):
-                
-                # 计算高斯值
-                dist_sq = (x - center_x)**2 + (y - center_y)**2
-                value = math.exp(-dist_sq / (2 * sigma**2))
-                
-                # 取最大值
-                heatmap[y, x] = max(heatmap[y, x], value)
     
     def _resize_data(self, image, char_heatmap, link_heatmap):
         """调整数据尺寸"""
@@ -306,29 +297,31 @@ class OCRDataset(Dataset):
         return image, char_heatmap, link_heatmap
 
 
-# 加载数据集
-ds = load_dataset("lansinuote/ocr_id_card")
-print("数据集键:", ds.keys())
-
-# 创建自定义数据集
-train_dataset = OCRDataset(ds, split='train')
-
-# 创建数据加载器
-data_loader = DataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=0)
-
-# 测试数据加载
-print(f"数据集大小: {len(train_dataset)}")
-
-for batch_idx, (images, char_heatmaps, link_heatmaps) in enumerate(data_loader):
-    print(f"\n批次 {batch_idx + 1}:")
-    print(f"  图像形状: {images.shape}")
-    print(f"  字符热图形状: {char_heatmaps.shape}")
-    print(f"  链接热图形状: {link_heatmaps.shape}")
-    print(f"  图像值范围: [{images.min():.3f}, {images.max():.3f}]")
-    print(f"  字符热图值范围: [{char_heatmaps.min():.3f}, {char_heatmaps.max():.3f}]")
-    print(f"  链接热图值范围: [{link_heatmaps.min():.3f}, {link_heatmaps.max():.3f}]")
+# 测试修复版本
+if __name__ == "__main__":
+    # 加载数据集
+    ds = load_dataset("lansinuote/ocr_id_card")
+    print("数据集键:", ds.keys())
     
-    if batch_idx >= 2:  # 只显示前3个批次
-        break
-
-print("\n✅ 数据加载器设置完成！可以用于CRAFT模型训练。") 
+    # 创建修复版数据集
+    train_dataset = OCRDatasetFixed(ds, split='train')
+    
+    # 创建数据加载器
+    data_loader = DataLoader(train_dataset, batch_size=2, shuffle=True, num_workers=0)
+    
+    # 测试数据加载
+    print(f"修复版数据集大小: {len(train_dataset)}")
+    
+    for batch_idx, (images, char_heatmaps, link_heatmaps) in enumerate(data_loader):
+        print(f"\n修复版批次 {batch_idx + 1}:")
+        print(f"  图像形状: {images.shape}")
+        print(f"  字符热图形状: {char_heatmaps.shape}")
+        print(f"  链接热图形状: {link_heatmaps.shape}")
+        print(f"  图像值范围: [{images.min():.3f}, {images.max():.3f}]")
+        print(f"  字符热图值范围: [{char_heatmaps.min():.3f}, {char_heatmaps.max():.3f}]")
+        print(f"  链接热图值范围: [{link_heatmaps.min():.3f}, {link_heatmaps.max():.3f}]")
+        
+        if batch_idx >= 1:  # 只显示前2个批次
+            break
+    
+    print("\n✅ 修复版数据加载器测试完成！") 

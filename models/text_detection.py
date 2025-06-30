@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import cv2
 import numpy as np
+import os
 from torchvision import models
 
 
@@ -110,12 +111,30 @@ class CRAFT(nn.Module):
 class TextDetector:
     """文本检测器封装类"""
     
-    def __init__(self, model_path=None, device='cpu'):
+    def __init__(self, model_path=None, device='cpu', use_pretrained=True):
         self.device = device
-        self.net = CRAFT(pretrained=True, freeze=False).to(device)
+        self.net = CRAFT(pretrained=use_pretrained, freeze=False).to(device)
         
-        if model_path:
-            self.net.load_state_dict(torch.load(model_path, map_location=device))
+        if model_path and os.path.exists(model_path):
+            print(f"正在加载自定义模型权重: {model_path}")
+            checkpoint = torch.load(model_path, map_location=device)
+            
+            # 处理不同的保存格式
+            if 'model_state_dict' in checkpoint:
+                # 完整的checkpoint格式
+                self.net.load_state_dict(checkpoint['model_state_dict'])
+                print(f"✅ 加载训练好的模型 - Epoch: {checkpoint.get('epoch', 'unknown')}")
+                print(f"训练损失: {checkpoint.get('train_loss', 'unknown'):.4f}" if checkpoint.get('train_loss') else "")
+            else:
+                # 只有模型权重的格式
+                self.net.load_state_dict(checkpoint)
+                print("✅ 模型权重加载成功")
+        elif model_path:
+            print(f"⚠️ 模型文件不存在: {model_path}")
+            if use_pretrained:
+                print("使用ImageNet预训练权重")
+            else:
+                print("使用随机初始化权重")
         
         self.net.eval()
         
