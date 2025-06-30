@@ -33,20 +33,22 @@ class OCRDataset(Dataset):
         if isinstance(image, Image.Image):
             image = np.array(image)
         
-        # 获取标注信息
+        # 获取标注信息 - 修复：数据在'ocr'字段中
         annotations = []
-        if 'box' in item and 'word' in item:
-            box_coords = item['box']
-            word = item['word']
-            cls = item.get('cls', 0)
-            
-            # 将box坐标转换为四边形坐标
-            coords = self._parse_box_coords(box_coords)
-            annotations.append({
-                'coords': coords,
-                'text': word,
-                'cls': cls
-            })
+        if 'ocr' in item:
+            for ocr_item in item['ocr']:
+                if 'box' in ocr_item and 'word' in ocr_item:
+                    box_coords = ocr_item['box']
+                    word = ocr_item['word']
+                    cls = ocr_item.get('cls', 0)
+                    
+                    # 将box坐标转换为四边形坐标
+                    coords = self._parse_box_coords(box_coords)
+                    annotations.append({
+                        'coords': coords,
+                        'text': word,
+                        'cls': cls
+                    })
         
         # 生成CRAFT训练用的热力图
         char_heatmap, link_heatmap = self._generate_heatmaps(image, annotations)
@@ -65,24 +67,24 @@ class OCRDataset(Dataset):
     
     def _parse_box_coords(self, box_coords):
         """解析边界框坐标"""
-        # 假设box_coords是[x1, y1, x2, y2, x3, y3, x4, y4]格式
-        coords = []
-        for i in range(0, len(box_coords), 2):
-            if i + 1 < len(box_coords):
-                x = float(box_coords[i])
-                y = float(box_coords[i + 1])
-                coords.append([x, y])
-        
-        # 如果只有两个点（矩形），扩展为四个点
-        if len(coords) == 2:
-            x1, y1 = coords[0]
-            x2, y2 = coords[1]
+        # box_coords是[x1, y1, x2, y2]格式（矩形边界框）
+        if len(box_coords) == 4:
+            x1, y1, x2, y2 = box_coords
+            # 转换为四个角点坐标
             coords = [
                 [x1, y1],  # 左上
                 [x2, y1],  # 右上
                 [x2, y2],  # 右下
                 [x1, y2]   # 左下
             ]
+        else:
+            # 如果是8点坐标格式，按原来的逻辑处理
+            coords = []
+            for i in range(0, len(box_coords), 2):
+                if i + 1 < len(box_coords):
+                    x = float(box_coords[i])
+                    y = float(box_coords[i + 1])
+                    coords.append([x, y])
         
         return np.array(coords)
     
