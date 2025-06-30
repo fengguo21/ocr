@@ -28,24 +28,57 @@ wheels/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# PyTorch 模型文件
+# PyTorch/TensorFlow 模型文件
 *.pth
 *.pt
 *.pkl
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.tflite
+
+# 模型检查点和权重文件
+checkpoints/
+checkpoints_*/
+checkpoint/
+checkpoint_*/
+*.checkpoint
+*checkpoint*
+best_model.*
+model_*.pth
+model_*.pt
+epoch_*.pth
+epoch_*.pt
+weights/
+weights_*/
+*.weights
+saved_models/
+models/checkpoints/
+
+# 训练日志和输出
+runs/
+logs/
+tensorboard/
+wandb/
+*.log
+training_logs/
+output/
+outputs/
 
 # 数据集
 datasets/
 data/
+dataset/
+train_data/
+test_data/
+val_data/
 *.csv
 *.json
 *.jpg
 *.jpeg
 *.png
 *.txt
-
-# 日志文件
-*.log
-logs/
 
 # 操作系统
 .DS_Store
@@ -78,9 +111,4 @@ ENV/
 tmp/
 temp/
 *.tmp
-*.bak
-
-# 检查点文件
-checkpoints/
-checkpoints_*/
-*.checkpoint 
+*.bak 
