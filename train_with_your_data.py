@@ -69,8 +69,8 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
             # 反向传播
             loss.backward()
             
-            # 梯度裁剪
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+            # 梯度裁剪 - 🔧 降低阈值防止梯度爆炸
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             
             optimizer.step()
             
@@ -100,7 +100,7 @@ def main():
     parser = argparse.ArgumentParser(description='训练CRAFT模型（自定义数据格式）')
     parser.add_argument('--batch_size', type=int, default=16, help='批大小')
     parser.add_argument('--epochs', type=int, default=50, help='训练轮数')
-    parser.add_argument('--lr', type=float, default=0.001, help='学习率')
+    parser.add_argument('--lr', type=float, default=0.0001, help='学习率')  # 🔧 降低学习率防止梯度爆炸
     parser.add_argument('--save_dir', type=str, default='checkpoints_custom', help='模型保存目录')
     parser.add_argument('--resume', type=str, help='恢复训练的模型路径')
     

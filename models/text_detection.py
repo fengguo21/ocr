@@ -60,6 +60,7 @@ class CRAFT(nn.Module):
             nn.Conv2d(32, 16, kernel_size=3, padding=1), nn.ReLU(inplace=True),
             nn.Conv2d(16, 16, kernel_size=1), nn.ReLU(inplace=True),
             nn.Conv2d(16, num_class, kernel_size=1),
+            nn.Sigmoid()  # 🔧 添加Sigmoid激活函数，确保输出在[0,1]范围
         )
 
         self.init_weights()
