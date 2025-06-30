@@ -81,7 +81,7 @@ class CRAFT(nn.Module):
             x = self.basenet[k](x)
             if k in [15, 22, 29]:  # conv3_3, conv4_3, conv5_3
                 sources.append(x)
-                print(x.shape,"x")
+                # print(x.shape,"x")
 
         # 上采样和特征融合 - 修复通道数匹配
         # conv5_3: 512 channels，不需要拼接
@@ -99,11 +99,11 @@ class CRAFT(nn.Module):
 
         # 最终上采样
         y = F.interpolate(y, size=(sources[0].size(2)*2, sources[0].size(3)*2), mode='bilinear', align_corners=False)
-        print(y.shape,"y")
+
         feature = self.upconv4(y)
-        print(feature.shape,"feature")
+
         y = self.conv_cls(feature)
-        print(y.shape,"y")
+
         return y.permute(0, 2, 3, 1), feature
 
 

@@ -98,7 +98,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
 
 def main():
     parser = argparse.ArgumentParser(description='训练CRAFT模型（自定义数据格式）')
-    parser.add_argument('--batch_size', type=int, default=4, help='批大小')
+    parser.add_argument('--batch_size', type=int, default=16, help='批大小')
     parser.add_argument('--epochs', type=int, default=50, help='训练轮数')
     parser.add_argument('--lr', type=float, default=0.001, help='学习率')
     parser.add_argument('--save_dir', type=str, default='checkpoints_custom', help='模型保存目录')
