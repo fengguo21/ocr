@@ -1,0 +1,86 @@
+# Conda 环境
+.conda/
+conda-meta/
+envs/
+
+# Python 相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyTorch 模型文件
+*.pth
+*.pt
+*.pkl
+
+# 数据集
+datasets/
+data/
+*.csv
+*.json
+*.jpg
+*.jpeg
+*.png
+*.txt
+
+# 日志文件
+*.log
+logs/
+
+# 操作系统
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 缓存
+.cache/
+.pytest_cache/
+
+# 环境变量
+.env
+.venv
+env/
+venv/
+ENV/
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.bak
+
+# 检查点文件
+checkpoints/
+checkpoints_*/
+*.checkpoint 
