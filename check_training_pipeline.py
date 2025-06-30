@@ -123,12 +123,12 @@ def check_loss_pipeline():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     criterion = CRAFTLoss()
     
-    # 创建测试数据
+    # 创建测试数据 - 🔧 修复：预测张量需要梯度
     batch_size = 2
     target_char = torch.rand(batch_size, 256, 256).to(device)
     target_link = torch.rand(batch_size, 256, 256).to(device)
-    pred_char = torch.rand(batch_size, 256, 256).to(device)
-    pred_link = torch.rand(batch_size, 256, 256).to(device)
+    pred_char = torch.rand(batch_size, 256, 256, requires_grad=True).to(device)
+    pred_link = torch.rand(batch_size, 256, 256, requires_grad=True).to(device)
     
     try:
         loss, cls_loss, geo_loss = criterion(target_char, pred_char, target_link, pred_link)
